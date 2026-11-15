@@ -1,0 +1,42 @@
+# Build output
+/build/
+/build.log
+
+# Local toolchain, SDKs, prebuilt CommonLibSSE-NG and other fetched dependencies
+/deps/
+/toolchain/
+/.wine*/
+/wineprefix*/
+
+# MSVC / Windows build artifacts
+*.dll
+*.lib
+*.exp
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.ipch
+*.pch
+*.map
+*.res
+*.exe
+
+# Packaged mod archives
+*.7z
+*.zip
+
+# Editors and tooling
+.vs/
+.vscode/
+.idea/
+.cache/
+.clangd/
+*.swp
+*~
+.DS_Store
+__pycache__/
+
+# Local notes and game logs copied in for analysis
+/logs/
+*.log
