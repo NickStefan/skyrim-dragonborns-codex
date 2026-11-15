@@ -27,6 +27,12 @@ namespace Console
 	// Every .txt under BatDirectory(), searched recursively: bat/ itself first, then by folder, by name in each.
 	std::vector<BatFile> FindBatFiles();
 
+	// A batch file's lines as written, or nullopt when it can't be read.
+	std::optional<std::vector<std::string>> ReadBatFile(const std::filesystem::path& a_path);
+
+	// False for the lines a batch run skips: blank, or starting with ; or //.
+	bool IsBatCommand(std::string_view a_line);
+
 	// Runs each command of a batch file in order; returns how many, or nullopt when it can't be read.
 	std::optional<int> RunBatFile(const std::filesystem::path& a_path, RE::ObjectRefHandle a_target = {});
 }

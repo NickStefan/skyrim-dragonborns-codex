@@ -686,6 +686,14 @@ namespace Menu
 		std::vector<std::string> g_consoleHistory;
 		std::vector<Console::BatFile> g_batFiles;
 		bool                          g_batScanned = false;  // rescanned on every open, so new files show up
+		bool                          g_batPreviewOnly = false;
+		struct BatPreview
+		{
+			std::filesystem::path    path;
+			std::string              title;
+			std::vector<std::string> lines;
+		};
+		std::optional<BatPreview> g_batPreview;
 
 		float g_hour = 12.0f;
 		float g_timescale = 20.0f;
@@ -3255,6 +3263,7 @@ namespace Menu
 			if (!g_batScanned) {
 				g_batFiles = Console::FindBatFiles();
 				g_batScanned = true;
+				g_batPreview.reset();
 			}
 			const auto u8 = dir.u8string();
 			const std::string dirText{ reinterpret_cast<const char*>(u8.data()), u8.size() };
@@ -3270,6 +3279,13 @@ namespace Menu
 			}
 			if (Button("console.bat_refresh")) {
 				g_batScanned = false;
+			}
+			if (!g_batFiles.empty()) {
+				SwitchRow("console.bat_preview_only", &g_batPreviewOnly, "console.bat_preview_only_help", [](bool a_on) {
+					if (!a_on) {
+						g_batPreview.reset();
+					}
+				});
 			}
 
 			const std::string* group = nullptr;
@@ -3297,11 +3313,51 @@ namespace Menu
 				}
 				first = false;
 				ImGui::PushID(static_cast<int>(i));
-				if (Button(bat.name.c_str())) {
-					const auto count = Console::RunBatFile(bat.path, g_target);
-					Status(count ? Lang::Fmt("console.bat_ran", bat.name, *count) : Lang::Fmt("console.bat_unreadable", bat.name));
+				const bool previewed = g_batPreview && g_batPreview->path == bat.path;
+				if (Button(bat.name.c_str(), previewed)) {
+					if (!g_batPreviewOnly) {
+						const auto count = Console::RunBatFile(bat.path, g_target);
+						Status(count ? Lang::Fmt("console.bat_ran", bat.name, *count) : Lang::Fmt("console.bat_unreadable", bat.name));
+					} else if (previewed) {
+						g_batPreview.reset();
+					} else if (auto lines = Console::ReadBatFile(bat.path)) {
+						g_batPreview = BatPreview{ bat.path, bat.group.empty() ? bat.name : bat.group + " / " + bat.name, std::move(*lines) };
+					} else {
+						Status(Lang::Fmt("console.bat_unreadable", bat.name));
+					}
 				}
 				ImGui::PopID();
+			}
+
+			if (g_batPreview) {
+				ImGui::Spacing();
+				ImGui::AlignTextToFramePadding();
+				ImGui::PushStyleColor(ImGuiCol_Text, T().title);
+				ImGui::TextUnformatted(g_batPreview->title.c_str());
+				ImGui::PopStyleColor();
+				ImGui::SameLine();
+				ImGui::PushStyleColor(ImGuiCol_Text, T().muted);
+				ImGui::TextUnformatted(Lang::Fmt("console.bat_preview_count",
+					std::ranges::count_if(g_batPreview->lines, [](const std::string& a_line) { return Console::IsBatCommand(a_line); })).c_str());
+				ImGui::PopStyleColor();
+
+				ImGui::PushStyleColor(ImGuiCol_ChildBg, T().bg);
+				ImGui::PushStyleColor(ImGuiCol_Border, T().line);
+				ImGui::BeginChild("##batpreview", { -FLT_MIN, S(260) }, ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
+				const float numberW = ImGui::CalcTextSize(std::to_string(g_batPreview->lines.size()).c_str()).x;
+				for (std::size_t n = 0; n < g_batPreview->lines.size(); ++n) {
+					const auto& line = g_batPreview->lines[n];
+					const auto  number = std::to_string(n + 1);
+					ImGui::PushStyleColor(ImGuiCol_Text, T().muted);
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + numberW - ImGui::CalcTextSize(number.c_str()).x);
+					ImGui::TextUnformatted(number.c_str());
+					ImGui::SameLine(0, S(12));
+					ImGui::PushStyleColor(ImGuiCol_Text, Console::IsBatCommand(line) ? T().text : T().muted);
+					ImGui::TextUnformatted(line.empty() ? " " : line.c_str());
+					ImGui::PopStyleColor(2);
+				}
+				ImGui::EndChild();
+				ImGui::PopStyleColor(2);
 			}
 			EndCard();
 		}

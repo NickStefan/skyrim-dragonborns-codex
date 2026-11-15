@@ -110,24 +110,50 @@ namespace Console
 		return files;
 	}
 
-	std::optional<int> RunBatFile(const std::filesystem::path& a_path, RE::ObjectRefHandle a_target)
+	std::optional<std::vector<std::string>> ReadBatFile(const std::filesystem::path& a_path)
 	{
 		std::ifstream file{ a_path };
 		if (!file) {
 			logger::warn("bat: can't read {}", Utf8(a_path));
 			return std::nullopt;
 		}
-		int         count = 0;
-		std::string line;
+		std::vector<std::string> lines;
+		std::string              line;
 		for (bool first = true; std::getline(file, line); first = false) {
 			if (first && line.starts_with("\xEF\xBB\xBF")) {
 				line.erase(0, 3);
 			}
-			line.erase(0, line.find_first_not_of(" \t"));
-			line.erase(line.find_last_not_of(" \t\r") + 1);
-			if (line.empty() || line.starts_with(';') || line.starts_with("//")) {
+			if (line.ends_with('\r')) {
+				line.pop_back();
+			}
+			lines.push_back(std::move(line));
+		}
+		return lines;
+	}
+
+	bool IsBatCommand(std::string_view a_line)
+	{
+		const auto start = a_line.find_first_not_of(" \t");
+		if (start == std::string_view::npos) {
+			return false;
+		}
+		a_line.remove_prefix(start);
+		return !a_line.starts_with(';') && !a_line.starts_with("//");
+	}
+
+	std::optional<int> RunBatFile(const std::filesystem::path& a_path, RE::ObjectRefHandle a_target)
+	{
+		auto lines = ReadBatFile(a_path);
+		if (!lines) {
+			return std::nullopt;
+		}
+		int count = 0;
+		for (auto& line : *lines) {
+			if (!IsBatCommand(line)) {
 				continue;
 			}
+			line.erase(0, line.find_first_not_of(" \t"));
+			line.erase(line.find_last_not_of(" \t") + 1);
 			Run(line, a_target);
 			++count;
 		}
