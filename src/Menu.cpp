@@ -684,6 +684,8 @@ namespace Menu
 
 		std::string              g_consoleInput;
 		std::vector<std::string> g_consoleHistory;
+		std::vector<Console::BatFile> g_batFiles;
+		bool                          g_batScanned = false;  // rescanned on every open, so new files show up
 
 		float g_hour = 12.0f;
 		float g_timescale = 20.0f;
@@ -1108,7 +1110,7 @@ namespace Menu
 				{ "card.quick_toggles", Icon::kSparkles }, { "card.active_now", Icon::kCheck }, { "card.recently_added", Icon::kChest },
 				{ "card.quick_actions", Icon::kKey }, { "card.recent_actions", Icon::kScroll }, { "card.appearance", Icon::kDwemerGear },
 				{ "card.controls", Icon::kKey }, { "card.about", Icon::kInfo }, { "card.knowledge_and_restrictions", Icon::kScroll }, { "card.custom_commands", Icon::kTilde },
-				{ "card.hotkeys", Icon::kKey }, { "card.console_command", Icon::kTilde }, { "card.target_under_crosshair", Icon::kEye },
+				{ "card.hotkeys", Icon::kKey }, { "card.console_command", Icon::kTilde }, { "card.bat_files", Icon::kScroll }, { "card.target_under_crosshair", Icon::kEye },
 			};
 			const auto it = icons.find(a_title);
 			return it != icons.end() ? std::optional{ it->second } : std::nullopt;
@@ -3246,6 +3248,64 @@ namespace Menu
 			EndCard();
 		}
 
+		// The game's console batch files (bat/*.txt), one button each, grouped by folder.
+		void BatFilesCard()
+		{
+			const auto dir = Console::BatDirectory();
+			if (!g_batScanned) {
+				g_batFiles = Console::FindBatFiles();
+				g_batScanned = true;
+			}
+			const auto u8 = dir.u8string();
+			const std::string dirText{ reinterpret_cast<const char*>(u8.data()), u8.size() };
+
+			BeginCard("card.bat_files");
+			std::error_code error;
+			if (!std::filesystem::is_directory(dir, error)) {
+				Muted(Lang::Fmt("console.bat_missing", dirText).c_str());
+			} else if (g_batFiles.empty()) {
+				Muted(Lang::Fmt("console.bat_empty", dirText).c_str());
+			} else {
+				Muted(Lang::Fmt("console.bat_intro", dirText).c_str());
+			}
+			if (Button("console.bat_refresh")) {
+				g_batScanned = false;
+			}
+
+			const std::string* group = nullptr;
+			bool               first = true;
+			for (std::size_t i = 0; i < g_batFiles.size(); ++i) {
+				const auto& bat = g_batFiles[i];
+				if (!group || *group != bat.group) {
+					group = &bat.group;
+					first = true;
+					ImGui::Spacing();
+					if (!bat.group.empty()) {
+						PushFont(Overlay::GetFonts().heading);
+						ImGui::PushStyleColor(ImGuiCol_Text, T().gold);
+						ImGui::TextUnformatted(bat.group.c_str());
+						ImGui::PopStyleColor();
+						ImGui::PopFont();
+					}
+				}
+				const float w = ImGui::CalcTextSize(bat.name.c_str()).x + ImGui::GetStyle().FramePadding.x * 2;
+				if (!first) {
+					ImGui::SameLine(0, S(8));
+					if (w > ImGui::GetContentRegionAvail().x) {
+						ImGui::NewLine();
+					}
+				}
+				first = false;
+				ImGui::PushID(static_cast<int>(i));
+				if (Button(bat.name.c_str())) {
+					const auto count = Console::RunBatFile(bat.path, g_target);
+					Status(count ? Lang::Fmt("console.bat_ran", bat.name, *count) : Lang::Fmt("console.bat_unreadable", bat.name));
+				}
+				ImGui::PopID();
+			}
+			EndCard();
+		}
+
 		void PageConsole()
 		{
 			BeginCard("card.console_command");
@@ -3269,6 +3329,8 @@ namespace Menu
 				ImGui::PopID();
 			}
 			EndCard();
+
+			BatFilesCard();
 		}
 
 		void PageQuests()
@@ -4479,6 +4541,7 @@ namespace Menu
 		g_openTime = Clock::now();
 		g_pageTime = g_openTime;
 		RequestNav(NavTarget::kSidebar, false);
+		g_batScanned = false;
 	}
 
 	namespace

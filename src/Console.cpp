@@ -52,4 +52,86 @@ namespace Console
 			log->Print("%.*s", static_cast<int>(a_text.size()), a_text.data());
 		}
 	}
+
+	namespace
+	{
+		std::string Utf8(const std::filesystem::path& a_path)
+		{
+			const auto text = a_path.u8string();
+			return { reinterpret_cast<const char*>(text.data()), text.size() };
+		}
+
+		std::string Lower(std::string a_text)
+		{
+			std::ranges::transform(a_text, a_text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			return a_text;
+		}
+	}
+
+	std::filesystem::path BatDirectory()
+	{
+		std::wstring exe(MAX_PATH, L'\0');
+		for (;;) {
+			const auto size = ::GetModuleFileNameW(nullptr, exe.data(), static_cast<DWORD>(exe.size()));
+			if (size == 0) {
+				return std::filesystem::current_path() / "bat";
+			}
+			if (size < exe.size()) {
+				exe.resize(size);
+				break;
+			}
+			exe.resize(exe.size() * 2);
+		}
+		return std::filesystem::path{ exe }.parent_path() / "bat";
+	}
+
+	std::vector<BatFile> FindBatFiles()
+	{
+		const auto           root = BatDirectory();
+		std::vector<BatFile> files;
+		std::error_code      error;
+		for (std::filesystem::recursive_directory_iterator it{ root, std::filesystem::directory_options::skip_permission_denied, error }, end; !error && it != end;
+			 it.increment(error)) {
+			if (!it->is_regular_file(error) || Lower(Utf8(it->path().extension())) != ".txt") {
+				continue;
+			}
+			std::string group;
+			for (const auto& part : it->path().parent_path().lexically_relative(root)) {
+				if (part != ".") {
+					group += (group.empty() ? "" : " / ") + Utf8(part);
+				}
+			}
+			files.push_back({ std::move(group), Utf8(it->path().stem()), it->path() });
+		}
+		std::ranges::sort(files, [](const BatFile& a, const BatFile& b) {
+			const auto ag = Lower(a.group), bg = Lower(b.group);
+			return ag != bg ? ag < bg : Lower(a.name) < Lower(b.name);
+		});
+		return files;
+	}
+
+	std::optional<int> RunBatFile(const std::filesystem::path& a_path, RE::ObjectRefHandle a_target)
+	{
+		std::ifstream file{ a_path };
+		if (!file) {
+			logger::warn("bat: can't read {}", Utf8(a_path));
+			return std::nullopt;
+		}
+		int         count = 0;
+		std::string line;
+		for (bool first = true; std::getline(file, line); first = false) {
+			if (first && line.starts_with("\xEF\xBB\xBF")) {
+				line.erase(0, 3);
+			}
+			line.erase(0, line.find_first_not_of(" \t"));
+			line.erase(line.find_last_not_of(" \t\r") + 1);
+			if (line.empty() || line.starts_with(';') || line.starts_with("//")) {
+				continue;
+			}
+			Run(line, a_target);
+			++count;
+		}
+		logger::info("bat: {} ({} commands)", Utf8(a_path), count);
+		return count;
+	}
 }
