@@ -40,7 +40,7 @@ namespace Input
 			}
 		}
 		// Gamepad: the right stick moves the cursor every frame (Overlay asks for it), the gamepadToggle buttons
-		// (L3 + R3 by default) toggle the menu.
+		// (none by default) toggle the menu.
 		std::atomic<float>      g_rightX{ 0.0f }, g_rightY{ 0.0f };
 		std::set<std::uint32_t> g_padHeld;
 
@@ -70,7 +70,6 @@ namespace Input
 			{ Pad::kRight, { "DPadRight" }, nullptr },
 		};
 		constexpr std::size_t kMaxToggleButtons = 3;
-		const std::vector<std::uint32_t> kDefaultToggle{ Pad::kLeftThumb, Pad::kRightThumb };
 
 		const PadButton* FindPadButton(std::uint32_t a_id)
 		{
@@ -119,18 +118,15 @@ namespace Input
 		const std::vector<std::uint32_t>& ToggleButtons()
 		{
 			static std::string                parsedFrom;
-			static std::vector<std::uint32_t> buttons = kDefaultToggle;
+			static std::vector<std::uint32_t> buttons;
 			if (const auto& text = Settings::Get().gamepadToggle; text != parsedFrom) {
 				parsedFrom = text;
 				if (auto ids = ParseToggle(text)) {
 					buttons = std::move(*ids);
 				} else {
-					buttons = kDefaultToggle;
-					logger::warn("gamepadToggle=\"{}\" is not up to {} known buttons joined with +; using L3+R3. Buttons: {}", text, kMaxToggleButtons,
+					buttons.clear();
+					logger::warn("gamepadToggle=\"{}\" is not up to {} known buttons joined with +, so it is off. Buttons: {}", text, kMaxToggleButtons,
 						PadButtonNames());
-				}
-				if (buttons.empty()) {
-					logger::info("gamepadToggle is off: no gamepad buttons open the menu");
 				}
 			}
 			return buttons;
@@ -502,6 +498,13 @@ namespace Input
 		g_open = a_open;
 	}
 
+	void TryOpenMenu()
+	{
+		if (!IsMenuOpen() && CanOpen()) {
+			SetMenuOpen(true);
+		}
+	}
+
 	bool IsKeyHeld(std::uint32_t a_dik) { return a_dik < g_held.size() && g_held[a_dik]; }
 
 	std::pair<float, float> RightStick() { return { g_rightX, g_rightY }; }
@@ -522,7 +525,7 @@ namespace Input
 	std::vector<std::string> GamepadToggleGlyphs()
 	{
 		std::vector<std::string> glyphs;
-		for (const auto id : ParseToggle(Settings::Get().gamepadToggle).value_or(kDefaultToggle)) {
+		for (const auto id : ParseToggle(Settings::Get().gamepadToggle).value_or(std::vector<std::uint32_t>{})) {
 			const auto button = FindPadButton(id);
 			glyphs.emplace_back(button->glyph ? button->glyph : button->names[0]);
 		}

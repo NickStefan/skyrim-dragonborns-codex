@@ -34,22 +34,7 @@ namespace Settings
 
 		std::optional<std::filesystem::path> FilePath()
 		{
-			static const auto path = [] {
-				auto file = PluginDirectory() / "DragonbornsCodex.ini";
-				// Earlier versions kept the settings in the SKSE log folder (Documents\My Games\...\SKSE), first as
-				// CheatMenu.ini: they come along once.
-				std::error_code ec;
-				if (const auto logs = SKSE::log::log_directory(); logs && !std::filesystem::exists(file, ec)) {
-					for (const auto name : { "DragonbornsCodex.ini", "CheatMenu.ini" }) {
-						if (const auto old = *logs / name; std::filesystem::exists(old, ec)) {
-							std::filesystem::copy_file(old, file, ec);
-							logger::info("Settings: copied {} to {}", old.string(), file.string());
-							break;
-						}
-					}
-				}
-				return file;
-			}();
+			static const auto path = PluginDirectory() / "DragonbornsCodex.ini";
 			return path;
 		}
 	}
@@ -185,7 +170,7 @@ namespace Settings
 				"# easiest set in the menu: Service > Controls > Menu Hotkey\n";
 		file << "toggleKey=" << g_data.toggleKey << '\n';
 		file << "# gamepadToggle: up to three gamepad buttons pressed together open and close the menu, joined with +\n"
-				"# (e.g. L3+R3, X, X+LB+LT); empty or none: no gamepad toggle. Buttons: " << Input::PadButtonNames() << "\n";
+				"# (e.g. L3+R3, X, X+LB+LT); empty (the default) or none: no gamepad toggle. Buttons: " << Input::PadButtonNames() << "\n";
 		file << "gamepadToggle=" << g_data.gamepadToggle << '\n';
 		if (!g_data.language.empty()) {
 			file << "language=" << g_data.language << '\n';

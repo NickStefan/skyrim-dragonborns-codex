@@ -16,6 +16,9 @@ namespace Input
 	void SimulateKey(std::uint32_t a_dik, bool a_down);
 	void SetMenuOpen(bool a_open);
 
+	// Opens the menu if the game is in a state where the toggle key would (a game loaded, no main menu or console).
+	void TryOpenMenu();
+
 	// Gamepad right stick, -1..1 (y up); the overlay moves the cursor with it while the menu is open.
 	std::pair<float, float> RightStick();
 

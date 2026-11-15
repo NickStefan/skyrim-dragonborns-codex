@@ -1,9 +1,10 @@
 Dragonborn's Codex @VERSION@
 ========================
 An in-game cheat and tool menu for Skyrim Special Edition / Anniversary Edition (SKSE plugin).
-Press Insert to open or close it (can be changed in Service -> Controls), or L3+R3 on a gamepad
-(gamepadToggle= in DragonbornsCodex.ini: up to three buttons joined with +, e.g. X+LB+LT; the ini lists the
-button names; leave it empty to turn the gamepad toggle off).
+Press Insert to open or close it (can be changed in Service -> Controls). On a gamepad, set a button combo
+with gamepadToggle= in Data\SKSE\Plugins\DragonbornsCodex.ini: up to three buttons joined with +, e.g. L3+R3
+or X+LB+LT (the ini lists the button names); it is unset by default. With SKSE Menu Framework installed, its
+menu also has a Dragonborn's Codex page with a button that opens the menu.
 
 This is a modified version of lnocriesl's Dragonborn's Codex 1.0.0, rebuilt from its released source
 on Linux against the CommonLibSSE-NG v15.7.0 prebuilt bundle. Third-party code compiled into the DLL

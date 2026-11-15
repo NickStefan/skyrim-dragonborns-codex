@@ -5,6 +5,7 @@
 #include "FastTravel.h"
 #include "Input.h"
 #include "Magic.h"
+#include "MenuFramework.h"
 #include "Overlay.h"
 #include "Settings.h"
 #include "SkillCap.h"
@@ -21,6 +22,7 @@ namespace
 			Catalog::BuildForms();
 			Overlay::Install();
 			Input::Install();
+			MenuFramework::Register();
 			Cheats::InstallEvents();
 			Magic::InstallPlayerHooks();
 			Health::InstallPlayerHooks();

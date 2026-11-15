@@ -88,6 +88,7 @@ def base_flags(warnings='/W3'):
     includes = [SRC, COMMONLIB / 'include', COMMONLIB / 'extern/openvr/headers',
                 THIRD_PARTY / 'spdlog/include', THIRD_PARTY / 'fmt/include',
                 THIRD_PARTY / 'DirectXTK/Inc', THIRD_PARTY / 'DirectXMath/Inc',
+                THIRD_PARTY / 'SKSEMenuFramework/resources',
                 IMGUI, IMGUI / 'backends', IMGUI / 'misc/cpp']
     return flags + ['/I' + wine_env.win(p) for p in includes]
 

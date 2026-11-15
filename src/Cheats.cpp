@@ -2619,7 +2619,7 @@ namespace Cheats
 	}
 
 	// ------------------------------------------------------------ character profiles (like Proteus)
-	// A profile is a text file in SKSE\CheatMenuProfiles: one "key=value" per line; forms as
+	// A profile is a text file in SKSE\DragonbornsCodexProfiles: one "key=value" per line; forms as
 	// "<plugin>|<local form ID>", so a profile still fits after the load order changed. The appearance is
 	// the player NPC's own data (head parts, hair colour, face texture, weight, skin, face sliders) plus the
 	// player's tint layers; the game's spf / lpf commands write nothing on this version.
@@ -2633,9 +2633,6 @@ namespace Cheats
 			}
 			auto path = *dir / "DragonbornsCodexProfiles";
 			std::error_code ec;
-			if (const auto old = *dir / "CheatMenuProfiles"; !std::filesystem::exists(path, ec) && std::filesystem::exists(old, ec)) {
-				std::filesystem::rename(old, path, ec);  // the menu's name before the rename
-			}
 			std::filesystem::create_directories(path, ec);
 			return path;
 		}

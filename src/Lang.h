@@ -1,6 +1,6 @@
 #pragma once
 
-// Menu text in English and Russian: Data/SKSE/Plugins/CheatMenu/lang/en.ini and ru.ini, "key=text" lines with
+// Menu text in English and Russian: Data/SKSE/Plugins/DragonbornsCodex/lang/en.ini and ru.ini, "key=text" lines with
 // the same keys in both. Code refers to strings by key ("section.name"); anything that is not a key passes through.
 namespace Lang
 {

@@ -7,6 +7,7 @@
 #include "Input.h"
 #include "LockpickHud.h"
 #include "Menu.h"
+#include "MenuFramework.h"
 #include "Settings.h"
 #include "TestBridge.h"
 #include "Textures.h"
@@ -171,6 +172,7 @@ namespace Overlay
 		void Render()
 		{
 			TestBridge::Poll();
+			MenuFramework::Update();
 			Hotkeys::Process();
 			ProcessLayoutRequest();
 			Cheats::Update();

@@ -38,8 +38,7 @@ namespace Settings
 	};
 
 	// Per-user menu settings (not per save): look, keys, favourites. Kept in DragonbornsCodex.ini next to the DLL
-	// (Data\SKSE\Plugins), written by the menu; the first run copies one from the SKSE log folder, where earlier
-	// versions kept it.
+	// (Data\SKSE\Plugins), written by the menu.
 	struct Data
 	{
 		bool                                 dark{ true };
@@ -47,7 +46,7 @@ namespace Settings
 		float                                uiScale{ 1.0f };  // on top of the resolution-based scale
 		std::array<float, 4>                 window{};          // x, y, w, h as parts of the screen, dragged by its edges; w 0: default
 		std::uint32_t                        toggleKey{ 0xD2 };  // DIK_INSERT
-		std::string                          gamepadToggle{ "L3+R3" };  // up to three buttons, see Input::kPadButtons
+		std::string                          gamepadToggle;  // up to three buttons, see Input::kPadButtons; empty: none
 		std::map<std::string, std::uint32_t> hotkeys;            // Hotkeys action id -> DIK code
 		std::set<std::string>                favorites;          // Catalog keys, see Key()
 		std::vector<std::string>             recent;             // newest first
@@ -57,7 +56,7 @@ namespace Settings
 		std::string                          language;  // "ru", "en" or empty = the game's language
 		EspLook                              esp;
 
-		// Fonts: a path relative to Data/SKSE/Plugins/CheatMenu or an absolute one; sizes in pixels at 1080p.
+		// Fonts: a path relative to Data/SKSE/Plugins/DragonbornsCodex or an absolute one; sizes in pixels at 1080p.
 		std::string fontBody{ "fonts/Jost-Regular.ttf" };
 		std::string fontHeading{ "fonts/Oswald-Regular.ttf" };
 		std::string fontTitle{ "fonts/Oswald-Light.ttf" };

@@ -14,11 +14,15 @@ Changes in this fork of lnocriesl's Dragonborn's Codex. The newest are at the to
 - Bat Files: a **Preview only** switch (off by default). With it on, a click shows the file's contents in a
   scrolling, line-numbered view instead of running it; lines a run would skip are greyed out.
 - `gamepadToggle=` in `DragonbornsCodex.ini` sets the gamepad combo that opens and closes the menu: one to
-  three buttons joined with `+`, such as `L3+R3` (the default), `X`, or `X+LB+LT`; empty, `none` or `off`
-  turns it off. Names: A, B, X, Y, LB/L1,
+  three buttons joined with `+`, such as `L3+R3`, `X`, or `X+LB+LT`. It is unset by default, so no gamepad
+  combo opens the menu until one is set; empty, `none` or `off` also leave it unset. Names: A, B, X, Y, LB/L1,
   RB/R1, LT/L2, RT/R2, L3/LS, R3/RS, Start/Menu, Back/Select/View, DPadUp, DPadDown, DPadLeft, DPadRight; case
-  doesn't matter. The ini lists them, an invalid value falls back to L3+R3 with a warning in the log, and the
-  menu's button hints show the combo in use.
+  doesn't matter. The ini lists them, an invalid value leaves the combo unset with a warning in the log, and
+  the menu's button hints show the combo in use.
+- [SKSE Menu Framework](https://github.com/QTR-Modding/SKSE-Menu-Framework-3) support, when it is
+  installed: a **Dragonborn's Codex** section with a General page that shows the menu's keyboard key and
+  gamepad combo, and an **Open Dragonborn's Codex** button that closes the framework's menu and opens this one.
+  The framework is optional; without it nothing changes.
 - The ini explains `toggleKey` (a DirectInput scan code in decimal; 210 is Insert).
 - The menu header shows **Current target: \<name\>**, or **Current target: none**, in place of the
   "Game connected" label, which was always shown.
@@ -40,13 +44,13 @@ Changes in this fork of lnocriesl's Dragonborn's Codex. The newest are at the to
 ### Changed
 
 - Settings now live in `Data/SKSE/Plugins/DragonbornsCodex.ini`, next to the DLL (with Mod Organizer 2, in
-  Overwrite), instead of `Documents/My Games/Skyrim Special Edition/SKSE/`. On first start an existing ini from
-  the old place (or the original's `CheatMenu.ini`) is copied over, so hotkeys, favourites and recent items
-  carry across. The log and character profiles stay in the SKSE folder.
+  Overwrite), instead of `Documents/My Games/Skyrim Special Edition/SKSE/`. The log and character profiles
+  (now `SKSE/DragonbornsCodexProfiles`) stay in the SKSE folder.
+- The gamepad combo that opens the menu (L3+R3 in the original) is no longer set by default; see
+  `gamepadToggle=` above.
 - While a gamepad drives the menu, the controls that capture a keyboard key are greyed out: Menu Hotkey's
   Change, the hotkey list's Assign, the custom commands' Key button and the key chips on rows.
-- The menu starts in the dark theme. A theme already saved in `DragonbornsCodex.ini` is kept, so existing
-  setups don't change; Service > Appearance > Theme switches it.
+- The menu starts in the dark theme; Service > Appearance > Theme switches it.
 - Menu text: "Highlights (ESP)" is now "Highlights", "ESP Look" is "Highlight Style", and "Reset ESP look"
   is "Reset highlight style".
 

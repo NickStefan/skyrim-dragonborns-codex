@@ -39,6 +39,7 @@ Not every library is necessarily used by this plugin; their notices are included
 | [Dear ImGui](https://github.com/ocornut/imgui) 1.92.8 (core, DX11 backend, `imgui_stdlib`) | MIT | `licenses/imgui.txt` |
 | [{fmt}](https://github.com/fmtlib/fmt) 12.2.0 | MIT | `licenses/fmt.txt` |
 | [spdlog](https://github.com/gabime/spdlog) 1.17.0 | MIT | `licenses/spdlog.txt` |
+| [SKSE Menu Framework](https://github.com/QTR-Modding/SKSE-Menu-Framework-3) consumer header (`SKSEMenuFramework.h`) | GPL-3.0 | `LICENSE.txt` |
 
 ## Data files
 
@@ -49,4 +50,4 @@ Not every library is necessarily used by this plugin; their notices are included
 
 ## Not included
 
-SKSE and Address Library are separate installs. The Microsoft Visual C++ runtime is installed by the player.
+SKSE, Address Library and (optionally) SKSE Menu Framework are separate installs. The Microsoft Visual C++ runtime is installed by the player.

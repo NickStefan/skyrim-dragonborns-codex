@@ -39,6 +39,9 @@ SOURCES = {
     'DirectXMath': ('https://github.com/microsoft/DirectXMath.git', 'jun2026'),
     # The version the original release was built with (vcpkg baseline 00c5775).
     'imgui': ('https://github.com/ocornut/imgui.git', 'v1.92.8'),
+    # Header only; its functions resolve from the player's SKSEMenuFramework.dll at runtime, if installed.
+    'SKSEMenuFramework': ('https://github.com/QTR-Modding/SKSE-Menu-Framework-3.git',
+                          '59a14ce192d63022e9174adf3da8c317b5f3091e'),
 }
 
 MSVC_WINE = ('https://github.com/mstorsjo/msvc-wine.git', '514f8ea34842cd6d831804d0e9658d3a32870ae1')
