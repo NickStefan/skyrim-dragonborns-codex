@@ -6,6 +6,7 @@
 #include "Settings.h"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 namespace Input
 {
@@ -39,6 +40,11 @@ namespace Input
 		// Gamepad: the right stick moves the cursor every frame (Overlay asks for it), L3 + R3 toggles the menu.
 		std::atomic<float> g_rightX{ 0.0f }, g_rightY{ 0.0f };
 		bool               g_leftThumb = false, g_rightThumb = false;
+		// Whichever was used last decides what A presses: the pointer (right stick, mouse) clicks where it is, the
+		// d-pad and left stick activate ImGui's navigation cursor. Kept from press to release.
+		bool g_pointing = false;
+		bool g_aClicks = false;
+		bool g_bCancels = false;  // B went to ImGui (leave a slider, close a popup) rather than closing the menu
 
 		ImGuiKey ToImGuiGamepadKey(std::uint32_t a_id)
 		{
@@ -132,11 +138,23 @@ namespace Input
 			if (!IsMenuOpen()) {
 				return;
 			}
+			if (id == Key::kB && edge) {
+				auto lock = Overlay::Lock();
+				if (a_button->IsDown()) {
+					const auto back = Menu::GamepadBack();
+					g_bCancels = back == Menu::Back::kImGui;
+					if (back == Menu::Back::kClose) {
+						SetMenuOpen(false);
+						return;
+					}
+				}
+				if (g_bCancels) {
+					ImGui::GetIO().AddKeyEvent(ImGuiKey_GamepadFaceRight, a_button->IsDown());
+				}
+				return;
+			}
 			if (a_button->IsDown()) {
 				switch (id) {
-				case Key::kB:
-					SetMenuOpen(false);
-					return;
 				case Key::kLeftShoulder:
 				case Key::kRightShoulder:
 					{
@@ -156,7 +174,19 @@ namespace Input
 				}
 				return;
 			}
+			if (id == Key::kA && edge) {
+				if (a_button->IsDown()) {
+					g_aClicks = g_pointing;
+				}
+				if (g_aClicks) {
+					io.AddMouseButtonEvent(ImGuiMouseButton_Left, a_button->IsDown());
+					return;
+				}
+			}
 			if (const auto key = ToImGuiGamepadKey(id); key != ImGuiKey_None && edge) {
+				if (id == Key::kUp || id == Key::kDown || id == Key::kLeft || id == Key::kRight) {
+					g_pointing = false;
+				}
 				io.AddKeyEvent(key, a_button->IsDown());
 			}
 		}
@@ -166,6 +196,9 @@ namespace Input
 			if (a_stick->IsRight()) {
 				g_rightX = a_stick->xValue;
 				g_rightY = a_stick->yValue;
+				if (std::abs(a_stick->xValue) > 0.15f || std::abs(a_stick->yValue) > 0.15f) {  // Overlay's dead zone
+					g_pointing = true;
+				}
 				return;
 			}
 			if (!IsMenuOpen()) {
@@ -174,6 +207,9 @@ namespace Input
 			auto  lock = Overlay::Lock();
 			auto& io = ImGui::GetIO();
 			const float x = a_stick->xValue, y = a_stick->yValue;
+			if (std::abs(x) > 0.3f || std::abs(y) > 0.3f) {
+				g_pointing = false;
+			}
 			io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickLeft, x < -0.3f, std::max(0.0f, -x));
 			io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickRight, x > 0.3f, std::max(0.0f, x));
 			io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickUp, y > 0.3f, std::max(0.0f, y));
@@ -280,6 +316,7 @@ namespace Input
 				}
 
 				if (auto move = a_event->AsMouseMoveEvent()) {
+					g_pointing = true;
 					auto lock = Overlay::Lock();
 					Overlay::MoveCursor(static_cast<float>(move->mouseInputX), static_cast<float>(move->mouseInputY));
 				} else if (auto ch = a_event->AsCharEvent(); ch && !Overlay::HasNativeText()) {

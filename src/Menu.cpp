@@ -878,12 +878,18 @@ namespace Menu
 
 		// ---------------------------------------------------------------- widgets
 
+		// ImGui leaves InvisibleButton out of gamepad and keyboard navigation unless asked; every one in the menu is a control.
+		bool NavButton(const char* a_id, const ImVec2& a_size)
+		{
+			return ImGui::InvisibleButton(a_id, a_size, ImGuiButtonFlags_EnableNav);
+		}
+
 		// Toggle switch, right-aligned in the current row.
 		bool Switch(const char* a_id, bool* a_value)
 		{
 			const ImVec2 size{ S(44), S(24) };
 			ImGui::PushID(a_id);
-			const bool clicked = ImGui::InvisibleButton("##sw", size);
+			const bool clicked = NavButton("##sw", size);
 			ImGui::PopID();
 			if (clicked) {
 				*a_value = !*a_value;
@@ -907,20 +913,41 @@ namespace Menu
 		// applied: on release, and (if a_live) a few times per second while dragging.
 		bool Slider(const char* a_id, float* a_value, float a_min, float a_max, const char* a_fmt, float a_width, bool a_live = true)
 		{
+			auto&        g = *GImGui;
+			auto         window = ImGui::GetCurrentWindow();
 			const ImVec2 size{ a_width, S(24) };
 			ImGui::PushID(a_id);
-			ImGui::InvisibleButton("##sl", size);
+			const ImGuiID id = window->GetID("##sl");
 			ImGui::PopID();
-			const auto  min = ImGui::GetItemRectMin();
-			const auto  max = ImGui::GetItemRectMax();
-			const bool  active = ImGui::IsItemActive();
-			const bool  released = ImGui::IsItemDeactivated();  // must be queried before any other item is submitted
-			const float grow = Anim(ImGui::GetItemID(), active || ImGui::IsItemHovered() ? 1.0f : 0.0f);
+			const ImRect bb{ window->DC.CursorPos, { window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y } };
+			ImGui::ItemSize(size);
 			const float pad = S(8);
-			if (active) {
-				const float t = std::clamp((ImGui::GetIO().MousePos.x - min.x - pad) / (size.x - 2 * pad), 0.0f, 1.0f);
-				*a_value = a_min + t * (a_max - a_min);
+			if (ImGui::ItemAdd(bb, id)) {
+				// As ImGui::SliderScalar: a click or the gamepad's A takes hold; with the gamepad, left/right then move it
+				// and A lets go.
+				const bool clicked = ImGui::ItemHoverable(bb, id, g.LastItemData.ItemFlags) && ImGui::IsMouseClicked(ImGuiMouseButton_Left, ImGuiInputFlags_None, id);
+				if (clicked) {
+					ImGui::SetKeyOwner(ImGuiKey_MouseLeft, id);
+				}
+				if (clicked || g.NavActivateId == id) {
+					ImGui::SetActiveID(id, window);
+					ImGui::SetFocusID(id, window);
+					ImGui::FocusWindow(window);
+					g.ActiveIdUsingNavDirMask |= (1 << ImGuiDir_Left) | (1 << ImGuiDir_Right);
+				}
+				// SliderBehavior keeps the grab's centre 2 px plus half a grab inside its rect: inset it so the centre
+				// runs exactly between the track's ends.
+				const float  inset = pad - 2.0f - g.Style.GrabMinSize * 0.5f;
+				const ImRect track{ { bb.Min.x + inset, bb.Min.y }, { bb.Max.x - inset, bb.Max.y } };
+				ImRect       grab;
+				ImGui::SliderBehavior(track, id, ImGuiDataType_Float, a_value, &a_min, &a_max, a_fmt, ImGuiSliderFlags_NoRoundToFormat, &grab);
+				ImGui::RenderNavCursor(bb, id);
 			}
+			const auto  min = bb.Min;
+			const auto  max = bb.Max;
+			const bool  active = g.ActiveId == id;
+			const bool  released = ImGui::IsItemDeactivated();  // must be queried before any other item is submitted
+			const float grow = Anim(id, active || ImGui::IsItemHovered() ? 1.0f : 0.0f);
 			const float t = std::clamp((*a_value - a_min) / (a_max - a_min), 0.0f, 1.0f);
 			const float y = (min.y + max.y) * 0.5f;
 			const float x = min.x + pad + t * (size.x - 2 * pad);
@@ -987,7 +1014,7 @@ namespace Menu
 				const float w = ImGui::CalcTextSize(l).x + S(20);
 				const auto  p = ImGui::GetCursorScreenPos();
 				ImGui::PushID(i);
-				if (ImGui::InvisibleButton("##seg", { w, h })) {
+				if (NavButton("##seg", { w, h })) {
 					*a_value = i;
 					changed = true;
 				}
@@ -1054,7 +1081,7 @@ namespace Menu
 			}
 			a_first = false;
 			const auto p = ImGui::GetCursorScreenPos();
-			const bool clicked = ImGui::InvisibleButton(a_label, { w, h });
+			const bool clicked = NavButton(a_label, { w, h });
 			const float hover = Anim(ImGui::GetItemID(), ImGui::IsItemHovered() ? 1.0f : 0.0f);
 			auto        dl = ImGui::GetWindowDrawList();
 			dl->AddRectFilled(p, { p.x + w, p.y + h }, Mix(T().seg, T().hover, hover), S(2));
@@ -1098,7 +1125,7 @@ namespace Menu
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, T().card);
 			ImGui::PushStyleColor(ImGuiCol_Border, T().line);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { S(16), D(12, 8) });
-			ImGui::BeginChild(a_title, { -FLT_MIN, 0 }, ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+			ImGui::BeginChild(a_title, { -FLT_MIN, 0 }, ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_NavFlattened);
 			const auto min = ImGui::GetWindowPos();
 			const auto max = ImVec2{ min.x + ImGui::GetWindowWidth(), min.y + ImGui::GetWindowHeight() };
 			Corners(ImGui::GetWindowDrawList(), min, max, S(7), S(3), Fade(T().gold, 0.7f), 1.0f);
@@ -1774,7 +1801,7 @@ namespace Menu
 							const bool  fav = favorites.contains(key);
 							const float h = ImGui::GetFrameHeight();
 							const auto  p = ImGui::GetCursorScreenPos();
-							if (ImGui::InvisibleButton("##fav", { S(26), h })) {
+							if (NavButton("##fav", { S(26), h })) {
 								if (fav) {
 									favorites.erase(key);
 								} else {
@@ -2133,7 +2160,7 @@ namespace Menu
 			ImU32& color = look.colors[a_kind];
 
 			// colour swatch, opens the picker
-			if (ImGui::InvisibleButton("##colour", { box * 1.5f, box })) {
+			if (NavButton("##colour", { box * 1.5f, box })) {
 				ImGui::OpenPopup("##picker");
 			}
 			const auto min = ImGui::GetItemRectMin();
@@ -2146,7 +2173,7 @@ namespace Menu
 					if (i % 6) {
 						ImGui::SameLine(0, S(4));
 					}
-					if (ImGui::InvisibleButton("##preset", { box, box })) {
+					if (NavButton("##preset", { box, box })) {
 						color = kEspPalette[i];
 						g_espLookDirty = true;
 					}
@@ -2178,7 +2205,7 @@ namespace Menu
 				if (shape) {
 					ImGui::SameLine(0, 0);
 				}
-				if (ImGui::InvisibleButton("##shape", { box, box })) {
+				if (NavButton("##shape", { box, box })) {
 					look.shapes[a_kind] = shape;
 					g_espLookDirty = true;
 				}
@@ -2421,7 +2448,7 @@ namespace Menu
 			bool         clicked = false;
 			bool         hovered = false;
 			if (a_clickable) {
-				clicked = ImGui::InvisibleButton(a_id, size);
+				clicked = NavButton(a_id, size);
 				hovered = ImGui::IsItemHovered();
 			} else {
 				ImGui::Dummy(size);
@@ -2485,7 +2512,7 @@ namespace Menu
 				[&] {
 					BeginCard("enchant.item");
 					CategoryCombo("##enchitemcat", Enchanter::ItemCategories(), &ui.itemCategory);
-					if (ImGui::BeginChild("##enchitemlist", { -FLT_MIN, S(460) })) {
+					if (ImGui::BeginChild("##enchitemlist", { -FLT_MIN, S(460) }, ImGuiChildFlags_NavFlattened)) {
 						bool any = false;
 						for (std::size_t i = 0; i < items.size(); ++i) {
 							const auto& it = items[i];
@@ -2600,7 +2627,7 @@ namespace Menu
 					if (ui.effects.size() >= kMaxEnchantEffects) {
 						muted(Lang::Fmt("enchant.no_more_than_effects_can", kMaxEnchantEffects));
 					}
-					if (ImGui::BeginChild("##enchoptlist", { -FLT_MIN, S(300) })) {
+					if (ImGui::BeginChild("##enchoptlist", { -FLT_MIN, S(300) }, ImGuiChildFlags_NavFlattened)) {
 						for (const auto& option : Enchanter::Options()) {
 							if (option.kind != item->kind || (ui.optionCategory != 0 && !(option.categories & (1u << ui.optionCategory)))) {
 								continue;
@@ -2663,7 +2690,7 @@ namespace Menu
 				}
 				const auto p = ImGui::GetCursorScreenPos();
 				ImGui::PushID(row.label);
-				const bool clicked = ImGui::InvisibleButton("##station", { w, h });
+				const bool clicked = NavButton("##station", { w, h });
 				RecordControl(row.label);
 				const bool  hovered = ImGui::IsItemHovered();
 				const float hover = Anim(ImGui::GetItemID(), hovered ? 1.0f : 0.0f);
@@ -2931,7 +2958,7 @@ namespace Menu
 								Status("world.weather_back_to_normal");
 							}
 							const auto needle = Text::ToLower(filter);
-							if (ImGui::BeginChild("##weathers", { -FLT_MIN, S(300) })) {
+							if (ImGui::BeginChild("##weathers", { -FLT_MIN, S(300) }, ImGuiChildFlags_NavFlattened)) {
 								for (const auto& w : Catalog::Weathers()) {
 									const auto label = std::format("{} · {}", Tr(w.kind), w.label);
 									if (!Text::Contains(Text::ToLower(label), needle)) {
@@ -3907,19 +3934,102 @@ namespace Menu
 		float g_activeH = 0;
 		float g_sideW = 270;  // sidebar width this frame, in pixels
 
+		// The sidebar and the main pane are separate nav spaces: ImGui scores a Left/Right move only against items
+		// level with the current one, so across the pane gap it found nothing or jumped to whatever row lined up.
+		enum class NavTarget
+		{
+			kNone,
+			kSidebar,  // the active page's sidebar item
+			kContent   // the first control of the page
+		};
+		NavTarget    g_navTarget = NavTarget::kNone;
+		bool         g_navShowCursor = false;
+		ImGuiWindow* g_sideWindow = nullptr;
+		ImGuiWindow* g_mainWindow = nullptr;
+		ImGuiID      g_leftFrom = 0;  // a Left press in the main pane; if nav is still here once it resolves, it hit the edge
+		int          g_leftFrame = 0;
+
+		void RequestNav(NavTarget a_target, bool a_showCursor)
+		{
+			g_navTarget = a_target;
+			g_navShowCursor = a_showCursor;
+		}
+
+		void ApplyNav(NavTarget a_target)
+		{
+			if (g_navTarget != a_target) {
+				return;
+			}
+			if (a_target == NavTarget::kSidebar) {
+				ImGui::FocusItem();
+			} else {
+				auto window = ImGui::GetCurrentWindow();
+				ImGui::NavMoveRequestCancel();
+				ImGui::SetNavWindow(window);
+				ImGui::NavInitWindow(window, true);
+			}
+			if (g_navShowCursor) {
+				GImGui->NavCursorVisible = true;
+				GImGui->NavHighlightItemUnderNav = true;
+			}
+			g_navTarget = NavTarget::kNone;
+		}
+
+		// g_sideWindow or g_mainWindow when gamepad nav is inside it, else null.
+		ImGuiWindow* NavRegion()
+		{
+			const auto window = GImGui->NavWindow;
+			for (const auto pane : { g_sideWindow, g_mainWindow }) {
+				if (window && pane && ImGui::IsWindowChildOf(window, pane, false)) {
+					return pane;
+				}
+			}
+			return nullptr;
+		}
+
+		void UpdateNav()
+		{
+			auto&      g = *GImGui;
+			const auto region = NavRegion();
+			const bool idle = g.ActiveId == 0 && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
+			const auto pressed = [](ImGuiKey a_dpad, ImGuiKey a_stick) {
+				return ImGui::IsKeyPressed(a_dpad, false) || ImGui::IsKeyPressed(a_stick, false);
+			};
+			if (g_leftFrom != 0 && ImGui::GetFrameCount() > g_leftFrame && !g.NavMoveSubmitted && !g.NavMoveForwardToNextFrame) {
+				if (g.NavId == g_leftFrom && region == g_mainWindow) {
+					RequestNav(NavTarget::kSidebar, true);
+				}
+				g_leftFrom = 0;
+			}
+			if (!idle || g_navTarget != NavTarget::kNone) {
+				return;
+			}
+			if (region == g_sideWindow && pressed(ImGuiKey_GamepadDpadRight, ImGuiKey_GamepadLStickRight)) {
+				RequestNav(NavTarget::kContent, true);
+			} else if (region == g_mainWindow && pressed(ImGuiKey_GamepadDpadLeft, ImGuiKey_GamepadLStickLeft)) {
+				g_leftFrom = g.NavId;
+				g_leftFrame = ImGui::GetFrameCount();
+			} else if (!region && (pressed(ImGuiKey_GamepadDpadUp, ImGuiKey_GamepadLStickUp) || pressed(ImGuiKey_GamepadDpadDown, ImGuiKey_GamepadLStickDown))) {
+				RequestNav(NavTarget::kSidebar, true);  // nav sat on the bare window (e.g. after a click on its background)
+			}
+		}
+
 
 		void SidebarItem(const PageInfo& a_info)
 		{
 			const float w = ImGui::GetContentRegionAvail().x;
 			const float h = D(38, 32);
 			const auto  p = ImGui::GetCursorScreenPos();
-			const bool clickedPage = ImGui::InvisibleButton(a_info.name, { w, h });
+			const bool clickedPage = NavButton(a_info.name, { w, h });
 			RecordControl(a_info.name);
 			if (clickedPage) {
 				g_page = a_info.page;
 				g_search.clear();
 			}
 			const bool active = g_page == a_info.page;
+			if (active) {
+				ApplyNav(NavTarget::kSidebar);
+			}
 			const bool hovered = ImGui::IsItemHovered();
 			const float glow = Anim(ImGui::GetItemID(), active || hovered ? 1.0f : 0.0f);
 			const float sel = Anim(ImGui::GetItemID() + 1, active ? 1.0f : 0.0f);
@@ -3947,6 +4057,7 @@ namespace Menu
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { S(14), S(20) });
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, S(2) });
 			ImGui::BeginChild("##side", { g_sideW, a_height }, ImGuiChildFlags_AlwaysUseWindowPadding);
+			g_sideWindow = ImGui::GetCurrentWindow();
 
 			auto       dl = ImGui::GetWindowDrawList();
 			const auto p = ImGui::GetCursorScreenPos();
@@ -4086,16 +4197,23 @@ namespace Menu
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, T().bg);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { S(28), S(16) });
 			ImGui::BeginChild("##main", { 0, a_height }, ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
+			g_mainWindow = ImGui::GetCurrentWindow();
 
-			// header: status, search, close
-			ImGui::PushStyleColor(ImGuiCol_Text, T().ok);
-			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted(Tr(Catalog::Forms().empty() ? "main.loading_lists" : "main.game_connected"));
-			ImGui::PopStyleColor();
-
+			// header: target, search, close
 			const float searchW = S(380);
 			const float langW = S(44);
-			ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - searchW - langW - S(54));
+			const float headerX = ImGui::GetWindowContentRegionMax().x - searchW - langW - S(54);
+			{
+				const auto  target = Lang::Fmt("main.current_target", g_targetName.empty() ? Tr("main.target_none") : g_targetName.c_str());
+				const auto  p = ImGui::GetCursorScreenPos();
+				const float h = ImGui::GetFrameHeight();
+				const float maxX = ImGui::GetWindowPos().x + headerX - S(12);
+				ImGui::PushStyleColor(ImGuiCol_Text, g_targetName.empty() ? T().muted : T().ok);
+				ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), { p.x, p.y + ImGui::GetStyle().FramePadding.y }, { maxX, p.y + h }, maxX, target.c_str(), nullptr, nullptr);
+				ImGui::PopStyleColor();
+				ImGui::Dummy({ 0, h });
+			}
+			ImGui::SameLine(headerX);
 			{
 				// Active keyboard layout, so it is obvious which language the search will type in.
 				const auto lang = Overlay::KeyboardLanguage();
@@ -4105,7 +4223,7 @@ namespace Menu
 				dl->AddRect(p, { p.x + langW, p.y + h }, T().line, S(2));
 				const auto ts = ImGui::CalcTextSize(lang.c_str());
 				dl->AddText({ p.x + (langW - ts.x) * 0.5f, p.y + (h - ts.y) * 0.5f }, T().accent, lang.c_str());
-				if (ImGui::InvisibleButton("##lang", { langW, h })) {
+				if (NavButton("##lang", { langW, h })) {
 					Overlay::RequestNextKeyboardLayout();
 				}
 				if (ImGui::IsItemHovered()) {
@@ -4129,7 +4247,7 @@ namespace Menu
 			ImGui::SameLine();
 			{
 				const auto p = ImGui::GetCursorScreenPos();
-				if (ImGui::InvisibleButton("##close", { S(36), S(36) })) {
+				if (NavButton("##close", { S(36), S(36) })) {
 					Input::SetMenuOpen(false);
 				}
 				DrawIcon(ImGui::GetWindowDrawList(), Icon::kClose, { p.x + S(18), p.y + S(18) }, S(18), ImGui::IsItemHovered() ? T().accent : T().text);
@@ -4174,7 +4292,8 @@ namespace Menu
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(0, 0, 0, 0));
 			// Every page keeps its own scroll position (one shared child made pages open half-scrolled).
 			const auto contentId = searching ? std::string{ "##content_search" } : std::format("##content{}", static_cast<int>(g_page));
-			ImGui::BeginChild(contentId.c_str(), { 0, ImGui::GetContentRegionAvail().y - footerH });
+			ImGui::BeginChild(contentId.c_str(), { 0, ImGui::GetContentRegionAvail().y - footerH }, ImGuiChildFlags_NavFlattened);
+			ApplyNav(NavTarget::kContent);
 			if (g_scrollRequest) {
 				ImGui::SetScrollY(*g_scrollRequest < 0 ? ImGui::GetScrollMaxY() : *g_scrollRequest);
 				g_scrollRequest.reset();
@@ -4312,6 +4431,25 @@ namespace Menu
 		const auto n = static_cast<int>(order.size());
 		g_page = order[((i + a_step) % n + n) % n];
 		g_search.clear();
+		if (const auto region = NavRegion()) {
+			RequestNav(region == g_mainWindow ? NavTarget::kContent : NavTarget::kSidebar, true);
+		}
+	}
+
+	Back GamepadBack()
+	{
+		auto& g = *GImGui;
+		if (g.ActiveId != 0 || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) {
+			return Back::kImGui;
+		}
+		if (NavRegion() != g_mainWindow) {
+			return Back::kClose;
+		}
+		if (g.NavWindow->RootWindowForNav != g_mainWindow) {
+			return Back::kImGui;
+		}
+		RequestNav(NavTarget::kSidebar, true);
+		return Back::kSidebar;
 	}
 
 	void OnOpen()
@@ -4340,6 +4478,7 @@ namespace Menu
 		g_status.clear();
 		g_openTime = Clock::now();
 		g_pageTime = g_openTime;
+		RequestNav(NavTarget::kSidebar, false);
 	}
 
 	namespace
@@ -4498,6 +4637,7 @@ namespace Menu
 		ImGui::PopStyleVar(2);
 
 		const float h = ImGui::GetContentRegionAvail().y;
+		UpdateNav();
 		DrawSidebar(h);
 		ImGui::SameLine(0, 0);
 		DrawMain(h);

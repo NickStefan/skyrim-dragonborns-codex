@@ -12,6 +12,15 @@ namespace Menu
 
 	// The next / previous sidebar page (gamepad shoulder buttons).
 	void CyclePage(int a_step);
+
+	// The gamepad's B: ImGui's cancel (an edit, a popup, a scrolling list), back from the page to the sidebar, or close.
+	enum class Back
+	{
+		kImGui,
+		kSidebar,
+		kClose
+	};
+	Back GamepadBack();
 	void SetSearch(std::string a_text);
 	void ScrollTo(float a_y);
 
