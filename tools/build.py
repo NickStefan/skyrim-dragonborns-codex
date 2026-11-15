@@ -199,6 +199,7 @@ def package_docs(folder):
     for doc in DOCS:
         (folder / doc).write_text((DIST / doc).read_text().replace('@VERSION@', text))
     shutil.copy2(ROOT / 'LICENSE', folder / 'LICENSE.txt')
+    shutil.copy2(ROOT / 'CHANGELOG.md', folder / 'CHANGELOG.md')
     shutil.copytree(DIST / 'licenses', folder / 'licenses')
 
     named = set(re.findall(r'licenses/([\w.-]+)', (DIST / 'THIRD-PARTY-NOTICES.md').read_text()))

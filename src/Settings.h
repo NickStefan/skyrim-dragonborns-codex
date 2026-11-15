@@ -37,15 +37,17 @@ namespace Settings
 		std::array<int, kEspKinds>           shapes = std::to_array(kEspDefaultShapes);
 	};
 
-	// Per-user menu settings (not per save): look, keys, favourites. Kept in
-	// Documents\My Games\Skyrim Special Edition\SKSE\DragonbornsCodex.ini (CheatMenu.ini before the rename).
+	// Per-user menu settings (not per save): look, keys, favourites. Kept in DragonbornsCodex.ini next to the DLL
+	// (Data\SKSE\Plugins), written by the menu; the first run copies one from the SKSE log folder, where earlier
+	// versions kept it.
 	struct Data
 	{
-		bool                                 dark{ false };
+		bool                                 dark{ true };
 		bool                                 compact{ false };  // tighter rows and cards
 		float                                uiScale{ 1.0f };  // on top of the resolution-based scale
 		std::array<float, 4>                 window{};          // x, y, w, h as parts of the screen, dragged by its edges; w 0: default
 		std::uint32_t                        toggleKey{ 0xD2 };  // DIK_INSERT
+		std::string                          gamepadToggle{ "L3+R3" };  // up to three buttons, see Input::kPadButtons
 		std::map<std::string, std::uint32_t> hotkeys;            // Hotkeys action id -> DIK code
 		std::set<std::string>                favorites;          // Catalog keys, see Key()
 		std::vector<std::string>             recent;             // newest first

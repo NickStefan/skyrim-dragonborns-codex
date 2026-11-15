@@ -1,7 +1,9 @@
 Dragonborn's Codex @VERSION@
 ========================
 An in-game cheat and tool menu for Skyrim Special Edition / Anniversary Edition (SKSE plugin).
-Press Insert to open or close it (can be changed in Service -> Controls).
+Press Insert to open or close it (can be changed in Service -> Controls), or L3+R3 on a gamepad
+(gamepadToggle= in DragonbornsCodex.ini: up to three buttons joined with +, e.g. X+LB+LT; the ini lists the
+button names; leave it empty to turn the gamepad toggle off).
 
 This is a modified version of lnocriesl's Dragonborn's Codex 1.0.0, rebuilt from its released source
 on Linux against the CommonLibSSE-NG v15.7.0 prebuilt bundle. Third-party code compiled into the DLL
@@ -20,7 +22,8 @@ Turn off the toggles you used (speed, damage, weightless items...) and save, the
 Values the game keeps in the save (for example a changed run speed) stay as they were when you removed it.
 
 Files it writes
-Documents\My Games\Skyrim Special Edition\SKSE\DragonbornsCodex.ini        your menu settings, hotkeys, favourites
+Data\SKSE\Plugins\DragonbornsCodex.ini   your menu settings, hotkeys, favourites (next to the DLL; created by
+                                         the menu; with Mod Organizer 2 it lands in Overwrite)
 Documents\My Games\Skyrim Special Edition\SKSE\DragonbornsCodex.log        log
 Documents\My Games\Skyrim Special Edition\SKSE\DragonbornsCodexProfiles\   character profiles
 Per-save state goes into the SKSE co-save next to your save.

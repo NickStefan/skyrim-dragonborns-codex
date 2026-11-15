@@ -1,7 +1,7 @@
 #pragma once
 
-// Menu icons, optional loose files in Data/SKSE/Plugins/DragonbornsCodex/icons, and key glyphs, read from the game's
-// own Interface/exported/*.png.dds (loose or in its BSAs). Loaded on first use, cached, released with the device.
+// Key glyphs, read from the game's own Interface/exported/*.png.dds (loose or in its BSAs). Loaded on first use,
+// cached, released with the device.
 namespace Textures
 {
 	struct Image
@@ -15,7 +15,7 @@ namespace Textures
 
 	void Init(void* a_device);  // ID3D11Device*
 
-	// a_name is relative to the folder and has no extension: "icons/home", "keys/esc".
+	// "keys/<name>" for Interface/exported/<name>.png.dds, e.g. "keys/esc"; any other name is an empty image.
 	// A failed load is remembered, so a missing file is looked for only once.
 	const Image& Get(std::string_view a_name);
 

@@ -18,8 +18,6 @@ namespace Overlay
 
 	bool         IsReady();
 
-	// A white texture with the given 8-bit alpha (tint it when drawing), as an ImGui texture id; 0 if it failed.
-	unsigned long long CreateAlphaTexture(const unsigned char* a_alpha, int a_width, int a_height);
 	const Fonts& GetFonts();
 	float        Scale();      // resolution scale x the user's "menu size" setting
 	float        UserScale();  // just the user's setting

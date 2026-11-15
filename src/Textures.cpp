@@ -6,8 +6,6 @@ namespace Textures
 {
 	namespace
 	{
-		const std::filesystem::path kRoot{ "Data/SKSE/Plugins/DragonbornsCodex" };
-
 		ID3D11Device*                                 g_device{ nullptr };
 		std::unordered_map<std::string, Image>        g_cache;
 		std::mutex                                    g_mutex;
@@ -94,15 +92,6 @@ namespace Textures
 			default:
 				return 0;  // not block-compressed
 			}
-		}
-
-		std::optional<std::vector<char>> ReadLoose(const std::filesystem::path& a_path)
-		{
-			std::ifstream in{ a_path, std::ios::binary };
-			if (!in) {
-				return std::nullopt;
-			}
-			return std::vector<char>{ std::istreambuf_iterator<char>{ in }, {} };
 		}
 
 		// Through the game's resource system: a loose file under Data, else the loaded BSAs.
@@ -199,12 +188,6 @@ namespace Textures
 				image = Load(path, ReadGame(path));
 				if (!image) {
 					logger::info("Textures: {} not in the game's files, using the key name", path);
-				}
-			} else {
-				const auto path = kRoot / (key + ".dds");
-				image = Load(path.string(), ReadLoose(path));
-				if (!image) {
-					logger::info("Textures: {} not available, using the drawn fallback", path.string());
 				}
 			}
 		}

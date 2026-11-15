@@ -8,6 +8,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include <ranges>
+
 namespace Input
 {
 	namespace
@@ -37,9 +39,102 @@ namespace Input
 				g_ctrl = a_down;
 			}
 		}
-		// Gamepad: the right stick moves the cursor every frame (Overlay asks for it), L3 + R3 toggles the menu.
-		std::atomic<float> g_rightX{ 0.0f }, g_rightY{ 0.0f };
-		bool               g_leftThumb = false, g_rightThumb = false;
+		// Gamepad: the right stick moves the cursor every frame (Overlay asks for it), the gamepadToggle buttons
+		// (L3 + R3 by default) toggle the menu.
+		std::atomic<float>      g_rightX{ 0.0f }, g_rightY{ 0.0f };
+		std::set<std::uint32_t> g_padHeld;
+
+		struct PadButton
+		{
+			std::uint32_t                   id;
+			std::array<std::string_view, 3> names;  // the first is the one shown; the rest are aliases
+			const char*                     glyph;  // the game's key glyph, or null for a framed name
+		};
+		using Pad = RE::BSWin32GamepadDevice::Key;
+		constexpr PadButton kPadButtons[] = {
+			{ Pad::kA, { "A" }, "keys/360_a" },
+			{ Pad::kB, { "B" }, "keys/360_b" },
+			{ Pad::kX, { "X" }, "keys/360_x" },
+			{ Pad::kY, { "Y" }, "keys/360_y" },
+			{ Pad::kLeftShoulder, { "LB", "L1" }, "keys/360_lb" },
+			{ Pad::kRightShoulder, { "RB", "R1" }, "keys/360_rb" },
+			{ Pad::kLeftTrigger, { "LT", "L2" }, "keys/360_lt" },
+			{ Pad::kRightTrigger, { "RT", "R2" }, "keys/360_rt" },
+			{ Pad::kLeftThumb, { "L3", "LS" }, "keys/360_ls" },
+			{ Pad::kRightThumb, { "R3", "RS" }, "keys/360_rs" },
+			{ Pad::kStart, { "Start", "Menu" }, "keys/360_start" },
+			{ Pad::kBack, { "Back", "Select", "View" }, "keys/360_back" },
+			{ Pad::kUp, { "DPadUp" }, nullptr },
+			{ Pad::kDown, { "DPadDown" }, nullptr },
+			{ Pad::kLeft, { "DPadLeft" }, nullptr },
+			{ Pad::kRight, { "DPadRight" }, nullptr },
+		};
+		constexpr std::size_t kMaxToggleButtons = 3;
+		const std::vector<std::uint32_t> kDefaultToggle{ Pad::kLeftThumb, Pad::kRightThumb };
+
+		const PadButton* FindPadButton(std::uint32_t a_id)
+		{
+			const auto it = std::ranges::find(kPadButtons, a_id, &PadButton::id);
+			return it != std::end(kPadButtons) ? &*it : nullptr;
+		}
+
+		// "X+LB+LT" -> button ids; case and spaces don't matter. Empty, "none" or "off": no buttons, no gamepad toggle.
+		// Nullopt for an unknown name, a repeat or too many.
+		std::optional<std::vector<std::uint32_t>> ParseToggle(std::string_view a_text)
+		{
+			std::vector<std::uint32_t> ids;
+			std::string                whole;
+			for (const char c : a_text) {
+				if (c != ' ' && c != '\t') {
+					whole += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+				}
+			}
+			if (whole.empty() || whole == "none" || whole == "off") {
+				return ids;
+			}
+			for (const auto part : std::views::split(a_text, '+')) {
+				std::string name;
+				for (const char c : part) {
+					if (c != ' ' && c != '\t') {
+						name += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+					}
+				}
+				const auto button = std::ranges::find_if(kPadButtons, [&](const PadButton& a_b) {
+					return std::ranges::any_of(a_b.names, [&](std::string_view a_n) {
+						return !a_n.empty() && std::ranges::equal(a_n, name, [](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) == b; });
+					});
+				});
+				if (button == std::end(kPadButtons) || std::ranges::contains(ids, button->id)) {
+					return std::nullopt;
+				}
+				ids.push_back(button->id);
+			}
+			if (ids.size() > kMaxToggleButtons) {
+				return std::nullopt;
+			}
+			return ids;
+		}
+
+		// The gamepadToggle setting, parsed again when it changes.
+		const std::vector<std::uint32_t>& ToggleButtons()
+		{
+			static std::string                parsedFrom;
+			static std::vector<std::uint32_t> buttons = kDefaultToggle;
+			if (const auto& text = Settings::Get().gamepadToggle; text != parsedFrom) {
+				parsedFrom = text;
+				if (auto ids = ParseToggle(text)) {
+					buttons = std::move(*ids);
+				} else {
+					buttons = kDefaultToggle;
+					logger::warn("gamepadToggle=\"{}\" is not up to {} known buttons joined with +; using L3+R3. Buttons: {}", text, kMaxToggleButtons,
+						PadButtonNames());
+				}
+				if (buttons.empty()) {
+					logger::info("gamepadToggle is off: no gamepad buttons open the menu");
+				}
+			}
+			return buttons;
+		}
 		// Whichever was used last decides what A presses: the pointer (right stick, mouse) clicks where it is, the
 		// d-pad and left stick activate ImGui's navigation cursor. Kept from press to release.
 		bool g_pointing = false;
@@ -128,11 +223,19 @@ namespace Input
 			using Key = RE::BSWin32GamepadDevice::Key;
 			const auto id = a_button->GetIDCode();
 			const bool edge = a_button->IsDown() || a_button->IsUp();
-			if (edge && (id == Key::kLeftThumb || id == Key::kRightThumb)) {
-				(id == Key::kLeftThumb ? g_leftThumb : g_rightThumb) = a_button->IsDown();
-				if (a_button->IsDown() && g_leftThumb && g_rightThumb && (IsMenuOpen() || CanOpen())) {
-					SetMenuOpen(!IsMenuOpen());
-				}
+			if (a_button->IsDown()) {
+				g_padHeld.insert(id);
+			} else if (a_button->IsUp()) {
+				g_padHeld.erase(id);
+			}
+			// The combo's other buttons still do their usual thing while it is being pressed.
+			const auto& toggle = ToggleButtons();
+			if (a_button->IsDown() && !toggle.empty() && std::ranges::contains(toggle, id) && std::ranges::all_of(toggle, [](auto a_b) { return g_padHeld.contains(a_b); }) &&
+				(IsMenuOpen() || CanOpen())) {
+				SetMenuOpen(!IsMenuOpen());
+				return;
+			}
+			if (id == Key::kLeftThumb || id == Key::kRightThumb) {
 				return;
 			}
 			if (!IsMenuOpen()) {
@@ -402,4 +505,27 @@ namespace Input
 	bool IsKeyHeld(std::uint32_t a_dik) { return a_dik < g_held.size() && g_held[a_dik]; }
 
 	std::pair<float, float> RightStick() { return { g_rightX, g_rightY }; }
+
+	std::string PadButtonNames()
+	{
+		std::string text;
+		for (const auto& button : kPadButtons) {
+			for (const auto name : button.names) {
+				if (!name.empty()) {
+					text += (text.empty() ? "" : ", ") + std::string{ name };
+				}
+			}
+		}
+		return text;
+	}
+
+	std::vector<std::string> GamepadToggleGlyphs()
+	{
+		std::vector<std::string> glyphs;
+		for (const auto id : ParseToggle(Settings::Get().gamepadToggle).value_or(kDefaultToggle)) {
+			const auto button = FindPadButton(id);
+			glyphs.emplace_back(button->glyph ? button->glyph : button->names[0]);
+		}
+		return glyphs;
+	}
 }

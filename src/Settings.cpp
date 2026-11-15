@@ -1,5 +1,7 @@
 #include "Settings.h"
 
+#include "Input.h"
+
 namespace Settings
 {
 	namespace
@@ -8,18 +10,46 @@ namespace Settings
 
 		Data g_data;
 
+		// The folder this DLL was loaded from (Data/SKSE/Plugins, or Mod Organizer's mapped copy of it).
+		std::filesystem::path PluginDirectory()
+		{
+			HMODULE module = nullptr;
+			if (::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+					reinterpret_cast<LPCWSTR>(&PluginDirectory), &module)) {
+				std::wstring path(MAX_PATH, L'\0');
+				for (;;) {
+					const auto size = ::GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
+					if (size == 0) {
+						break;
+					}
+					if (size < path.size()) {
+						path.resize(size);
+						return std::filesystem::path{ path }.parent_path();
+					}
+					path.resize(path.size() * 2);
+				}
+			}
+			return "Data/SKSE/Plugins";
+		}
+
 		std::optional<std::filesystem::path> FilePath()
 		{
-			auto dir = SKSE::log::log_directory();
-			if (!dir) {
-				return std::nullopt;
-			}
-			// the menu was called Cheat Menu before: its settings come along once
-			const auto path = *dir / "DragonbornsCodex.ini";
-			std::error_code ec;
-			if (const auto old = *dir / "CheatMenu.ini"; !std::filesystem::exists(path, ec) && std::filesystem::exists(old, ec)) {
-				std::filesystem::copy_file(old, path, ec);
-			}
+			static const auto path = [] {
+				auto file = PluginDirectory() / "DragonbornsCodex.ini";
+				// Earlier versions kept the settings in the SKSE log folder (Documents\My Games\...\SKSE), first as
+				// CheatMenu.ini: they come along once.
+				std::error_code ec;
+				if (const auto logs = SKSE::log::log_directory(); logs && !std::filesystem::exists(file, ec)) {
+					for (const auto name : { "DragonbornsCodex.ini", "CheatMenu.ini" }) {
+						if (const auto old = *logs / name; std::filesystem::exists(old, ec)) {
+							std::filesystem::copy_file(old, file, ec);
+							logger::info("Settings: copied {} to {}", old.string(), file.string());
+							break;
+						}
+					}
+				}
+				return file;
+			}();
 			return path;
 		}
 	}
@@ -59,6 +89,8 @@ namespace Settings
 					}
 				} else if (key == "toggleKey") {
 					g_data.toggleKey = static_cast<std::uint32_t>(std::stoul(value));
+				} else if (key == "gamepadToggle") {
+					g_data.gamepadToggle = value;
 				} else if (key.starts_with("hotkey.")) {
 					g_data.hotkeys[std::string{ key.substr(7) }] = static_cast<std::uint32_t>(std::stoul(value));
 				} else if (key == "fontBody") {
@@ -149,11 +181,16 @@ namespace Settings
 		if (g_data.window[2] > 0.0f) {
 			file << std::format("window={:.4f},{:.4f},{:.4f},{:.4f}\n", g_data.window[0], g_data.window[1], g_data.window[2], g_data.window[3]);
 		}
+		file << "# toggleKey: the keyboard key that opens the menu, as a DirectInput scan code in decimal (210 = Insert);\n"
+				"# easiest set in the menu: Service > Controls > Menu Hotkey\n";
 		file << "toggleKey=" << g_data.toggleKey << '\n';
+		file << "# gamepadToggle: up to three gamepad buttons pressed together open and close the menu, joined with +\n"
+				"# (e.g. L3+R3, X, X+LB+LT); empty or none: no gamepad toggle. Buttons: " << Input::PadButtonNames() << "\n";
+		file << "gamepadToggle=" << g_data.gamepadToggle << '\n';
 		if (!g_data.language.empty()) {
 			file << "language=" << g_data.language << '\n';
 		}
-		file << "# fonts: a path relative to Data/SKSE/Plugins/CheatMenu or an absolute one, size in pixels at 1080p; restart the game after a change\n";
+		file << "# fonts: a path relative to Data/SKSE/Plugins/DragonbornsCodex or an absolute one, size in pixels at 1080p; restart the game after a change\n";
 		file << "fontBody=" << g_data.fontBody << '\n';
 		file << "fontHeading=" << g_data.fontHeading << '\n';
 		file << "fontTitle=" << g_data.fontTitle << '\n';

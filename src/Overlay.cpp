@@ -385,37 +385,4 @@ namespace Overlay
 		// Drops held keys/buttons so nothing stays "pressed" on the next open.
 		ImGui::GetIO().AddFocusEvent(false);
 	}
-
-	unsigned long long CreateAlphaTexture(const unsigned char* a_alpha, int a_width, int a_height)
-	{
-		if (!g_device) {
-			return 0;
-		}
-		std::vector<std::uint32_t> pixels(static_cast<std::size_t>(a_width) * a_height);
-		for (std::size_t i = 0; i < pixels.size(); ++i) {
-			pixels[i] = 0x00FFFFFFu | (static_cast<std::uint32_t>(a_alpha[i]) << 24);
-		}
-		D3D11_TEXTURE2D_DESC desc{};
-		desc.Width = a_width;
-		desc.Height = a_height;
-		desc.MipLevels = 1;
-		desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.SampleDesc.Count = 1;
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		D3D11_SUBRESOURCE_DATA data{ pixels.data(), static_cast<UINT>(a_width * 4), 0 };
-		ID3D11Texture2D* texture = nullptr;
-		if (FAILED(g_device->CreateTexture2D(&desc, &data, &texture))) {
-			return 0;
-		}
-		ID3D11ShaderResourceView* view = nullptr;
-		D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
-		viewDesc.Format = desc.Format;
-		viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		viewDesc.Texture2D.MipLevels = 1;
-		const auto hr = g_device->CreateShaderResourceView(texture, &viewDesc, &view);
-		texture->Release();
-		return SUCCEEDED(hr) ? reinterpret_cast<unsigned long long>(view) : 0;
-	}
 }

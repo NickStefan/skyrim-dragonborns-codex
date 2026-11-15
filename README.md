@@ -12,11 +12,11 @@ release. The original built with CMake and vcpkg on Windows; this one builds on 
   CMake generated.
 - `assets/DragonbornsCodex/` the menu's runtime data (languages, fonts), copied into
   `Data/SKSE/Plugins/DragonbornsCodex/`. No Bethesda files are shipped: key glyphs are read at runtime from the
-  game's `Interface/exported/*.png.dds`, and the menu icons are drawn in code. Loose `icons/<name>.dds` files are
-  still picked up if present (see `IconTexture` in `src/Menu.cpp`).
+  game's `Interface/exported/*.png.dds`, and the menu icons are drawn in code.
 - `dist/` the player readme, third-party notices and license texts packaged with the DLL.
 - `tools/` the build scripts.
 - `VERSION` the plugin version, compiled into the DLL and the packaged readme.
+- `CHANGELOG.md` what changed in this fork, newest first; packaged next to the readme.
 
 ## Build (Linux / SteamOS)
 

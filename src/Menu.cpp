@@ -11,9 +11,7 @@
 #include "Magic.h"
 #include "Overlay.h"
 #include "Settings.h"
-#include "LogoData.h"
 #include "Text.h"
-#include "ItemIcons.h"
 #include "Textures.h"
 
 #include <imgui.h>
@@ -219,45 +217,9 @@ namespace Menu
 			kWarn
 		};
 
-		// The game's map markers (exported from map.swf into Data/SKSE/Plugins/DragonbornsCodex/icons) for the icons that
-		// have one; white with alpha, so they take the tint. The rest, and all of them if the files are missing,
-		// are line icons drawn below.
-		const char* IconTexture(Icon a_icon)
-		{
-			switch (a_icon) {
-			case Icon::kHall: return "icons/home";
-			case Icon::kHelmet: return "icons/dovahkiin";
-			case Icon::kAxeSword: return "icons/combat";
-			case Icon::kShout: return "icons/magic";
-			case Icon::kRuneCircle: return "icons/schools";
-			case Icon::kStaff: return "icons/enchant";
-			case Icon::kConstellation: return "icons/progress";
-			case Icon::kMoons: return "icons/world";
-			case Icon::kMap: return "icons/teleport";
-			case Icon::kScroll: return "icons/quests";
-			case Icon::kEye: return "icons/target";
-			case Icon::kTilde: return "icons/console";
-			case Icon::kChest: return "icons/items";
-			case Icon::kDragonHead: return "icons/actors";
-			case Icon::kDwemerGear: return "icons/service";
-			case Icon::kHammer: return "icons/mine";
-			case Icon::kUsers: return "icons/town";
-			default: return nullptr;
-			}
-		}
-
 		// Line icons drawn in a 24x24 design grid, scaled to a_size.
 		void DrawIcon(ImDrawList* a_dl, Icon a_icon, ImVec2 a_center, float a_size, ImU32 a_col)
 		{
-			if (const auto name = IconTexture(a_icon)) {
-				if (const auto& image = Textures::Get(name)) {
-					const float h = a_size * 1.15f;  // markers are drawn a bit larger: they have no stroke padding
-					const float w = h * image.width / image.height;
-					a_dl->AddImage(static_cast<ImTextureID>(image.id), { a_center.x - w * 0.5f, a_center.y - h * 0.5f }, { a_center.x + w * 0.5f, a_center.y + h * 0.5f },
-						{ 0, 0 }, { 1, 1 }, a_col);
-					return;
-				}
-			}
 			const float k = a_size / 24.0f;
 			const float w = std::max(1.0f, 1.8f * k);
 			auto        P = [&](float x, float y) { return ImVec2{ a_center.x + (x - 12.0f) * k, a_center.y + (y - 12.0f) * k }; };
@@ -660,18 +622,6 @@ namespace Menu
 		};
 		std::vector<HistoryEntry> g_history;
 
-		// The Skyrim emblem as a texture, made on first use.
-		unsigned long long LogoTexture()
-		{
-			static unsigned long long texture = 0;
-			static bool               tried = false;
-			if (!tried) {
-				tried = true;
-				texture = Overlay::CreateAlphaTexture(LogoData::kAlpha, LogoData::kWidth, LogoData::kHeight);
-			}
-			return texture;
-		}
-
 		// The result of an action: in the footer, and as a notice on top (also seen when the action closed the menu).
 		void Status(std::string a_text)
 		{
@@ -1040,6 +990,9 @@ namespace Menu
 			return changed;
 		}
 
+		// The gamepad drives the menu; key capture only listens to the keyboard, so its controls are greyed out.
+		bool GamepadMode() { return GImGui->NavInputSource == ImGuiInputSource_Gamepad; }
+
 		bool Button(const char* a_label, bool a_primary = false, float a_width = 0.0f)
 		{
 			a_label = Tr(a_label);
@@ -1278,7 +1231,7 @@ namespace Menu
 				if (ImGui::IsItemHovered()) {
 					ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 					g_help = key ? "row.change_key_help" : "row.assign_key_help";
-					if (!capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+					if (!capturing && !GamepadMode() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
 						Hotkeys::BeginCapture(action->id);
 					}
 				}
@@ -1829,12 +1782,6 @@ namespace Menu
 
 						ImGui::TableNextColumn();
 						ImGui::AlignTextToFramePadding();
-						if (const float h = ImGui::GetFrameHeight(), size = S(20); !actors) {
-							const auto p = ImGui::GetCursorScreenPos();
-							if (ItemIcons::Draw(ImGui::GetWindowDrawList(), e.formID, { p.x, p.y + (h - size) * 0.5f }, size, T().text)) {
-								ImGui::SetCursorScreenPos({ p.x + size + S(8), p.y });
-							}
-						}
 						ImGui::TextUnformatted(e.name.c_str());
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(Catalog::CategoryName(e.category));
@@ -2447,9 +2394,8 @@ namespace Menu
 		constexpr std::size_t kMaxEnchantEffects = 10;
 
 		// A row of the Enchanting page's lists in a frame of its own (a pill when a_rounding is large); true when clicked.
-		// a_icon: a form whose item icon goes before the text (ItemIcons), 0 for none.
 		bool FramedRow(const char* a_id, const std::string& a_text, bool a_selected, float a_rounding, bool a_center = false, bool a_muted = false,
-			bool a_clickable = true, RE::FormID a_icon = 0)
+			bool a_clickable = true)
 		{
 			const float  h = ImGui::GetTextLineHeight() + D(12, 8);
 			const ImVec2 size{ ImGui::GetContentRegionAvail().x, h };
@@ -2471,10 +2417,7 @@ namespace Menu
 			dl->AddRect(min, max, a_selected ? T().accent : T().line, r, 0, S(1));
 			const float tw = ImGui::CalcTextSize(a_text.c_str()).x;
 			const float pad = std::max(S(10), r * 0.6f);
-			float       x = a_center ? std::max(min.x + pad, min.x + (size.x - tw) * 0.5f) : min.x + pad;
-			if (const float icon = S(20); a_icon && ItemIcons::Draw(dl, a_icon, { x, min.y + (h - icon) * 0.5f }, icon, a_muted ? T().muted : T().text)) {
-				x += icon + S(8);
-			}
+			const float x = a_center ? std::max(min.x + pad, min.x + (size.x - tw) * 0.5f) : min.x + pad;
 			dl->PushClipRect({ min.x + S(2), min.y }, { max.x - S(2), max.y }, true);
 			dl->AddText({ x, min.y + (h - ImGui::GetTextLineHeight()) * 0.5f }, a_muted ? T().muted : T().text, a_text.c_str());
 			dl->PopClipRect();
@@ -2538,7 +2481,7 @@ namespace Menu
 							if (it.worn) {
 								label += Tr("enchant.equipped");
 							}
-							const bool picked = FramedRow("##item", label, item == &it, S(4), false, false, true, it.object);
+							const bool picked = FramedRow("##item", label, item == &it, S(4));
 							RecordControl(it.name);
 							if (picked) {
 								ui.selected = true;
@@ -3493,9 +3436,11 @@ namespace Menu
 						Status(Lang::Fmt("commands.done", c.command));
 					}
 					ImGui::SameLine(0, S(6));
+					ImGui::BeginDisabled(GamepadMode());
 					if (Button("common.key")) {
 						Hotkeys::BeginCapture(id);
 					}
+					ImGui::EndDisabled();
 					ImGui::SameLine(0, S(6));
 					if (Button("×")) {
 						Hotkeys::Clear(id);
@@ -3527,9 +3472,11 @@ namespace Menu
 			}
 			KeyChip(capturing ? "hotkeys.press" : Hotkeys::KeyName(key), capturing);
 			ImGui::SameLine(0, S(8));
+			ImGui::BeginDisabled(GamepadMode());
 			if (Button("hotkeys.assign")) {
 				Hotkeys::BeginCapture(a_action.id);
 			}
+			ImGui::EndDisabled();
 			if (key) {
 				ImGui::SameLine(0, S(6));
 				if (Button("×")) {
@@ -3584,9 +3531,11 @@ namespace Menu
 						const bool capturing = Hotkeys::IsCapturing() && Hotkeys::CaptureTarget() == Hotkeys::kMenuKey;
 						KeyChip(capturing ? "row.press_a_key" : ToggleKeyName(), capturing);
 						ImGui::SameLine(0, S(10));
+						ImGui::BeginDisabled(GamepadMode());
 						if (Button("service.change")) {
 							Hotkeys::BeginCapture(std::string{ Hotkeys::kMenuKey });
 						}
+						ImGui::EndDisabled();
 						EndRow(nullptr);
 					}
 					EndCard();
@@ -3640,15 +3589,6 @@ namespace Menu
 			{
 				const auto name = Text::ToUtf8(player->GetName());
 				BeginCard(name.empty() ? "page.dragonborn" : name.c_str());
-				if (const auto logo = LogoTexture()) {
-					// The emblem, faint, in the corner of the hero card.
-					const auto  win = ImGui::GetWindowPos();
-					const float h = S(120);
-					const float w = h * LogoData::kWidth / LogoData::kHeight;
-					const float x = win.x + ImGui::GetWindowWidth() - w - S(20);
-					ImGui::GetWindowDrawList()->AddImage(static_cast<ImTextureID>(logo), { x, win.y + S(8) }, { x + w, win.y + S(8) + h }, { 0, 0 }, { 1, 1 },
-						Fade(T().gold, 0.10f));
-				}
 				const auto race = player->GetRace() ? Text::ToUtf8(player->GetRace()->GetFullName()) : std::string{};
 				if (ImGui::BeginTable("##hero", 2, ImGuiTableFlags_SizingStretchProp)) {
 					ImGui::TableSetupColumn("##who", ImGuiTableColumnFlags_WidthStretch, 1.0f);
@@ -4179,17 +4119,7 @@ namespace Menu
 
 			auto       dl = ImGui::GetWindowDrawList();
 			const auto p = ImGui::GetCursorScreenPos();
-			{
-				// The Skyrim dragon emblem, from the game's own main-menu logo mesh.
-				const float h = S(54);
-				const float w = h * LogoData::kWidth / LogoData::kHeight;
-				if (const auto logo = LogoTexture()) {
-					dl->AddImage(static_cast<ImTextureID>(logo), { p.x + S(28) - w * 0.5f, p.y + S(23) - h * 0.5f }, { p.x + S(28) + w * 0.5f, p.y + S(23) + h * 0.5f },
-						{ 0, 0 }, { 1, 1 }, T().gold);
-				} else {
-					DrawIcon(dl, Icon::kDragon, { p.x + S(28), p.y + S(23) }, S(26), T().gold);
-				}
-			}
+			DrawIcon(dl, Icon::kDragon, { p.x + S(28), p.y + S(23) }, S(26), T().gold);
 			PushFont(Overlay::GetFonts().heading);
 			dl->AddText({ p.x + S(62), p.y + S(2) }, T().title, "DRAGONBORN'S CODEX");
 			ImGui::PopFont();
@@ -4296,8 +4226,10 @@ namespace Menu
 			const auto toggle = KeyGlyph(Settings::Get().toggleKey);
 			std::vector<std::pair<std::vector<std::string>, const char*>> hints;
 			if (GImGui->NavInputSource == ImGuiInputSource_Gamepad) {
-				hints = { { { "keys/360_a" }, "keys.select" }, { { "keys/360_b" }, "keys.close" }, { { "keys/360_lb", "keys/360_rb" }, "keys.sections" },
-					{ { "keys/360_ls", "keys/360_rs" }, "keys.menu" } };
+				hints = { { { "keys/360_a" }, "keys.select" }, { { "keys/360_b" }, "keys.close" }, { { "keys/360_lb", "keys/360_rb" }, "keys.sections" } };
+				if (auto toggleGlyphs = Input::GamepadToggleGlyphs(); !toggleGlyphs.empty()) {
+					hints.emplace_back(std::move(toggleGlyphs), "keys.menu");
+				}
 			} else {
 				hints = { { { "keys/esc" }, "keys.close" }, { { toggle ? toggle : ToggleKeyName() }, "keys.menu" }, { { "keys/l-ctrl", "keys/f" }, "keys.search" },
 					{ { "keys/mouse2" }, "common.key" } };

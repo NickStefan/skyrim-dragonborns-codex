@@ -18,4 +18,11 @@ namespace Input
 
 	// Gamepad right stick, -1..1 (y up); the overlay moves the cursor with it while the menu is open.
 	std::pair<float, float> RightStick();
+
+	// The button names gamepadToggle accepts, comma-separated, for the ini comment.
+	std::string PadButtonNames();
+
+	// The gamepad toggle's buttons for the footer hint: "keys/360_x" glyph names, or a name to frame ("DPadUp");
+	// empty when gamepadToggle is off.
+	std::vector<std::string> GamepadToggleGlyphs();
 }
